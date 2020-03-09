@@ -1,0 +1,11 @@
+{
+  "name": "hfsm-client",
+  "version": "0.1.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"None\""
+  },
+  "author": "jferroal@gmail.com",
+  "license": "UNLICENSED"
+}
