@@ -5,13 +5,16 @@ import time
 import subprocess
 import asyncio
 import docker
+import pathlib
 from aiohttp import web
 from aiofile import AIOFile, Writer
 
-working_dir = '/' + os.path.join('home', 'jz', 'Projects', 'fabric-samples')
-configtxlator_bin_path = os.path.join(
-    working_dir, os.path.join('bin', 'configtxlator'))
-
+working_dir = pathlib.PurePath('/home/jz/Projects/fabric-samples')
+configtxlator_bin_path = pathlib.PurePath(working_dir + '/bin/configtxlator')
+orderer_ca = pathlib.PurePath(
+    '/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/example.com/msp/tlscacerts/tlsca.example.com-cert.pem')
+orderer_endpoint = 'orderer.example.com:7050'
+port = 8888
 
 def block_pb_2_json(pbfile, jsonfile):
     os.system(configtxlator_bin_path + ' proto_decode --input ' +
@@ -21,7 +24,6 @@ def block_pb_2_json(pbfile, jsonfile):
 def envelope_json_2_pb(jsonfile, pbfile):
     os.system(configtxlator_bin_path + ' proto_encode --input ' +
               jsonfile + ' --type common.Envelope --output ' + pbfile)
-
 
 class DockerContainer:
 
@@ -42,7 +44,7 @@ class DockerContainer:
     def exec(self, command):
         if not command:
             raise Exception("command is necessary")
-        code, logs = self._container.exec_run(command)
+        , logs = self._container.exec_run(command)
         return logs
 
     def to_json(self):
@@ -110,11 +112,8 @@ async def get_channel_config(request):
     DockerContainer.refresh_containers()
     body = await validate_body(request, ['id', 'channel'])
     container = DockerContainer.containers[body['id']]
-    command = ('peer channel fetch config '
-               + 'channel-artifacts/{channel}.config.block -c {channel}'
-               #    + '--tls -o localhost:8050 '
-               #    + '--cafile /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/example.com/msp/tlscacerts/tlsca.example.com-cert.pem'
-               ).format(channel=body['channel'])
+    command = 'peer channel fetch config channel-artifacts/{channel}.config.block -c {channel}'
+    .format(channel=body['channel'])
     logs_content = container.exec(command)
     block_pb_path = os.path.join(
         working_dir,
@@ -132,13 +131,14 @@ async def get_channel_config(request):
         block_pb_path,
         block_json_path
     )
-    with open(block_json_path, 'r') as rf:
+    async with AIOFile(block_json_path, 'r') as arf:
+        content = await arf.read()
         return web.Response(
             text=json.dumps(
                 dict(
                     content=logs_content.decode(),
-                    config=json.load(
-                        rf)['data']['data'][0]['payload']['data']['config']['channel_group']
+                    config=json.loads(content)[
+                        'data']['data'][0]['payload']['data']['config']['channel_group']
                 )
             ),
             content_type='application/json'
@@ -172,9 +172,15 @@ async def update_channel_config(request):
         command = ('peer channel update'
                    + ' -f channel-artifacts/{channel}.config.enveloped.block'
                    + ' -c {channel}'
-                   + ' --tls -o orderer.example.com:7050'
-                   + ' --cafile /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/example.com/msp/tlscacerts/tlsca.example.com-cert.pem'
-                   ).format(channel=body['channel'])
+                   + ' --tls '
+                   + ' -o {orderer_endpoint}'
+                   + ' --cafile {orderer_ca}'
+                   )
+        .format(
+            channel=body['channel'],
+            orderer_ca=orderer_ca,
+            orderer_endpoint=orderer_endpoint
+        )
         logs_content = container.exec(command)
         return web.Response(
             text=json.dumps(dict(content=logs_content.decode())),
@@ -188,4 +194,4 @@ if __name__ == "__main__":
     app.router.add_post('/exec', execute)
     app.router.add_post('/get-channel-config', get_channel_config)
     app.router.add_post('/update-channel-config', update_channel_config)
-    web.run_app(app, host='0.0.0.0', port=8888)
+    web.run_app(app, host='0.0.0.0', port=port)
