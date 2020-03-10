@@ -18,7 +18,7 @@ body {
 }
 
 .content {
-  width: 60%;
+  min-width: 1280px;
   margin: 0 auto;
 }
 .content > section {
@@ -52,16 +52,62 @@ body {
 .container-item:hover {
   background-color: grey;
 }
-.command-input input {
-  width: 80%;
+
+.input-container {
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  height: 32px;
 }
-.logs {
+.input-container input {
+  box-sizing: border-box;
+  flex-basis: 70%;
+  height: 100%;
+  border-top-left-radius: 4px;
+  border-bottom-left-radius: 4px;
+  border-right: 0;
+}
+.input-container button {
+  flex: 1;
+  height: 100%;
+  border-left: 0;
+  border-top-right-radius: 4px;
+  border-bottom-right-radius: 4px;
+  cursor: pointer;
+}
+.output {
   display: flex;
   flex-direction: column;
+  padding: 16px 4px;
+  min-height: 120px;
 }
-.logs code {
+.output .result {
   text-align: start;
+  line-break: anywhere;
+  color: #f0f0f0;
+  background-color: #0f0f0f;
+  padding: 2px 4px;
+  line-height: 1.2;
 }
+
+.config textarea {
+  min-height: 1000px;
+}
+
+.config textarea:disabled {
+  background-color: #0f0f0f;
+  border: 0;
+}
+
+.config-compare-editor {
+  display: flex;
+  justify-content: space-between;
+}
+
+.config-compare-editor article {
+  flex-basis: 49%;
+}
+
 </style>
 
 <template>
@@ -76,7 +122,10 @@ body {
             :key="container.id"
             @click="() => onContainerSelect(container)"
           >
-            <div v-if="current.container && container.id === current.container.id" class="selected">*</div>
+            <div
+              v-if="current.container && container.id === current.container.id"
+              class="selected"
+            >*</div>
             <p>{{container.id.slice(0, 6)}}</p>
             <p>{{container.name}}</p>
             <p>{{container.status}}</p>
@@ -86,41 +135,94 @@ body {
         </article>
       </section>
       <section>
-        <h3>Command</h3>
-        <div class="command-input">
+        <h3>Command & Shortcuts</h3>
+        <div class="command input-container">
           <input v-model="current.command" />
-          <button @click="() => onExecuteClick(i)">Execute</button>
+          <button @click="() => execute()">Execute</button>
+        </div>
+        <div class="shortcuts input-container">
+          <input v-model="shortcuts.channel" />
+          <button @click="getChannelConfig">Get Channel Config</button>
+        </div>
+      </section>
+      <section>
+        <h3>Config</h3>
+        <div class="config-compare-editor">
+        <article class="output config">
+          <textarea class="result" disabled="true" v-model="shortcuts.config"></textarea>
+        </article>
+        <article class="output config">
+          <textarea class="result" :disabled="!shortcuts.newConfig" v-model="shortcuts.newConfig"></textarea>
+        </article>
         </div>
       </section>
       <section>
         <h3>Logs</h3>
-        <article class="logs">
-          <code style="text-align: start" v-for="(log, i) in current.logs" :key="i">{{log}}</code>
+        <article class="output logs">
+          <code class="result" v-for="(log, i) in current.logs" :key="i">{{log}}</code>
         </article>
+        
       </section>
     </div>
   </div>
 </template>
 
 <script>
-
-import * as axios from 'axios';
+import * as axios from "axios";
 
 const APIs = {
   listContainers: async () => {
-    const {data} = await axios.post('http://172.30.4.121:3000/container', {hosts: ['172.30.4.121']});
+    const { data } = await axios.post("http://172.30.4.121:3000/container", {
+      hosts: ["172.30.4.121"]
+    });
     return data;
   },
   fetchContainerLogs: async (id, host, tail = 100) => {
-    const {data} = await axios.post(`http://172.30.4.121:3000/container/${id}/logs`, {host, tail})
+    const {
+      data
+    } = await axios.post(`http://172.30.4.121:3000/container/${id}/logs`, {
+      host,
+      tail
+    });
     return data;
   },
-  executeContainerCommand: () => alert("Not Implemented")
-}
+  executeContainerCommand: async (
+    id,
+    host,
+    command = "peer channel getinfo -c mychannel"
+  ) => {
+    const {
+      data
+    } = await axios.post(`http://172.30.4.121:3000/container/${id}/exec`, {
+      host,
+      command
+    });
+    return data;
+  },
+  getChannelConfig: async (
+    id,
+    host,
+    channel
+  ) => {
+    const {
+      data
+    } = await axios.post(`http://172.30.4.121:3000/container/${id}/get-channel-config`, {
+      host,
+      channel
+    });
+    return data;
+  }
+};
 
 export default {
   name: "App",
   components: {},
+  filters: {
+    prettifyJSON(s) {
+      console.log(s);
+      return s;
+    }
+  },
   methods: {
     onContainerSelect(item) {
       alert("Select");
@@ -128,51 +230,75 @@ export default {
         container: item,
         comamnd: "",
         logs: ""
-      }
+      };
       this.logs();
     },
     async list() {
       if (this.loading) return;
       this.loading = true;
-      const {items} = await APIs.listContainers();
-      console.log(items);
+      const { items } = await APIs.listContainers();
       this.containers = items;
+      this.current.container = items[0];
       this.loading = false;
     },
     async logs(tail = 100) {
       if (this.loading) return;
       this.loading = true;
-      const {content} = await APIs.fetchContainerLogs(
-        this.current.container.id, 
+      const { content } = await APIs.fetchContainerLogs(
+        this.current.container.id,
         this.current.container.host,
         tail
       );
-      this.current.logs = content.split('\n');
-      console.log(this.current.logs)
+      this.current.logs = content.split("\n");
       this.loading = false;
     },
     async execute() {
       if (this.loading) return;
       if (!this.current.container) {
         alert("No container selected");
+        return;
       }
       if (!this.current.command) {
         alert("No command input");
+        return;
       }
       this.loading = true;
-      const {content} = await APIs.executeContainerCommand(this.current.container.id);
+      const { content } = await APIs.executeContainerCommand(
+        this.current.container.id,
+        this.current.container.host,
+        this.current.container.command
+      );
       this.current.logs = content.split("\n");
-      console.log(this.current.logs)
       this.loading = false;
     },
+    async getChannelConfig() {
+      if (this.loading) return;
+      if (!this.current.container) {
+        alert("No container selected");
+        return;
+      }
+      this.loading = true;
+      const { content, config } = await APIs.getChannelConfig(
+        this.current.container.id,
+        this.current.container.host,
+        this.shortcuts.channel
+      );
+      this.current.logs = content.split("\n");
+      this.shortcuts.config = JSON.stringify(config, null, 2); 
+      this.shortcuts.newConfig = this.shortcuts.config;
+      this.loading = false;
+    }
   },
   data() {
     return {
       loading: false,
       current: {
         container: null,
-        command: "",
+        command: "peer channel getinfo -c mychannel",
         logs: ""
+      },
+      shortcuts: {
+        channel: ""
       },
       containers: []
     };

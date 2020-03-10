@@ -43,9 +43,25 @@ router.post("/:id/logs", async (ctx, next) => {
 });
 
 router.post("/:id/exec", async (ctx, next) => {
-  this.body = `Foo Bar Baz! ${ctx.route.prefix}`;
+  const host = ctx.request.body.host;
+  const command = ctx.request.body.command;
+  const id = ctx.params.id;
+  const url = `http://${host}:8888/exec`
+  const {data} = await axios.post(url, {id, command});
+  ctx.body = data;
   return next();
 });
+
+router.post('/:id/get-channel-config', async (ctx, next) => {
+  const host = ctx.request.body.host;
+  const channel = ctx.request.body.channel;
+  const id = ctx.params.id;
+  const url = `http://${host}:8888/channel-config`
+  const {data} = await axios.post(url, {id, channel});
+  ctx.body = data;
+  return next();
+
+})
 
 const app = new Koa();
 app.use(cors());
