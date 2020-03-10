@@ -1,9 +1,12 @@
 # -*- utf-8 -*-
 import os
 import json
+import time
 import subprocess
-from aiohttp import web
+import asyncio
 import docker
+from aiohttp import web
+from aiofile import AIOFile, Writer
 
 working_dir = '/' + os.path.join('home', 'jz', 'Projects', 'fabric-samples')
 configtxlator_bin_path = os.path.join(
@@ -14,17 +17,10 @@ def block_pb_2_json(pbfile, jsonfile):
     os.system(configtxlator_bin_path + ' proto_decode --input ' +
               pbfile + ' --type common.Block > ' + jsonfile)
 
+
 def envelope_json_2_pb(jsonfile, pbfile):
-    subprocess.run([
-        configtxlator_bin_path,
-        'proto_decode',
-        '--input',
-        jsonfile,
-        '--type'
-        'common.Envelope',
-        '--output',
-        pbfile
-    ])
+    os.system(configtxlator_bin_path + ' proto_encode --input ' +
+              jsonfile + ' --type common.Envelope --output ' + pbfile)
 
 
 class DockerContainer:
@@ -141,17 +137,55 @@ async def get_channel_config(request):
             text=json.dumps(
                 dict(
                     content=logs_content.decode(),
-                    config=json.load(rf)['data']['data'][0]['payload']['data']['config']['channel_group']
+                    config=json.load(
+                        rf)['data']['data'][0]['payload']['data']['config']['channel_group']
                 )
             ),
             content_type='application/json'
         )
 
 
+async def update_channel_config(request):
+    DockerContainer.refresh_containers()
+    body = await validate_body(request, ['id', 'channel', 'envelope'])
+    block_json_path = os.path.join(
+        working_dir,
+        'first-network',
+        'channel-artifacts',
+        body['channel'] + '.config.enveloped.json'
+    )
+    async with AIOFile(block_json_path, 'w') as afp:
+        writer = Writer(afp)
+        await writer(json.dumps(body['envelope']))
+        await afp.fsync()
+        block_pb_path = os.path.join(
+            working_dir,
+            'first-network',
+            'channel-artifacts',
+            body['channel'] + '.config.enveloped.block'
+        )
+        envelope_json_2_pb(
+            block_json_path,
+            block_pb_path
+        )
+        container = DockerContainer.containers[body['id']]
+        command = ('peer channel update'
+                   + ' -f channel-artifacts/{channel}.config.enveloped.block'
+                   + ' -c {channel}'
+                   + ' --tls -o orderer.example.com:7050'
+                   + ' --cafile /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/example.com/msp/tlscacerts/tlsca.example.com-cert.pem'
+                   ).format(channel=body['channel'])
+        logs_content = container.exec(command)
+        return web.Response(
+            text=json.dumps(dict(content=logs_content.decode())),
+            content_type='application/json'
+        )
+
 if __name__ == "__main__":
     app = web.Application()
     app.router.add_get('/', list_latest)
     app.router.add_post('/logs', logs)
     app.router.add_post('/exec', execute)
-    app.router.add_post('/channel-config', get_channel_config)
+    app.router.add_post('/get-channel-config', get_channel_config)
+    app.router.add_post('/update-channel-config', update_channel_config)
     web.run_app(app, host='0.0.0.0', port=8888)

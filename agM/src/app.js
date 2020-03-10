@@ -56,11 +56,22 @@ router.post('/:id/get-channel-config', async (ctx, next) => {
   const host = ctx.request.body.host;
   const channel = ctx.request.body.channel;
   const id = ctx.params.id;
-  const url = `http://${host}:8888/channel-config`
+  const url = `http://${host}:8888/get-channel-config`
   const {data} = await axios.post(url, {id, channel});
   ctx.body = data;
   return next();
+});
 
+router.put('/:id/update-channel-config', async (ctx, next) => {
+  console.debug('update channel config');
+  const host = ctx.request.body.host;
+  const channel = ctx.request.body.channel;
+  const envelope = ctx.request.body.envelope;
+  const id = ctx.params.id;
+  const url = `http://${host}:8888/update-channel-config`
+  const {data} = await axios.post(url, {id, channel, envelope});
+  ctx.body = data;
+  return next();
 })
 
 const app = new Koa();
@@ -68,7 +79,6 @@ app.use(cors());
 app.use(koaBody());
 app.use(json());
 app.use(router.middleware());
-console.debug(router.routes);
 app.listen(3000, () => {
   console.info("Start listening on 3000");
 });

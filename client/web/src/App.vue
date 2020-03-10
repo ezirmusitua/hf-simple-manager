@@ -135,7 +135,7 @@ body {
         </article>
       </section>
       <section>
-        <h3>Command & Shortcuts</h3>
+        <h3>Command + Shortcuts</h3>
         <div class="command input-container">
           <input v-model="current.command" />
           <button @click="() => execute()">Execute</button>
@@ -147,6 +147,7 @@ body {
       </section>
       <section>
         <h3>Config</h3>
+        <button @click="updateChannelConfig">Update Config</button>
         <div class="config-compare-editor">
         <article class="output config">
           <textarea class="result" disabled="true" v-model="shortcuts.config"></textarea>
@@ -161,7 +162,6 @@ body {
         <article class="output logs">
           <code class="result" v-for="(log, i) in current.logs" :key="i">{{log}}</code>
         </article>
-        
       </section>
     </div>
   </div>
@@ -211,18 +211,28 @@ const APIs = {
       channel
     });
     return data;
+  },
+  updateChannelConfig: async (
+    id,
+    host,
+    channel,
+    envelope
+  ) => {
+    const {
+      data
+    } = await axios.put(`http://172.30.4.121:3000/container/${id}/update-channel-config`, {
+      host,
+      channel,
+      envelope
+    });
+    return data;
   }
 };
 
 export default {
   name: "App",
   components: {},
-  filters: {
-    prettifyJSON(s) {
-      console.log(s);
-      return s;
-    }
-  },
+  filters: {},
   methods: {
     onContainerSelect(item) {
       alert("Select");
@@ -282,6 +292,42 @@ export default {
         this.current.container.id,
         this.current.container.host,
         this.shortcuts.channel
+      );
+      this.current.logs = content.split("\n");
+      this.shortcuts.config = JSON.stringify(config, null, 2); 
+      this.shortcuts.newConfig = this.shortcuts.config;
+      this.loading = false;
+    },
+    async updateChannelConfig() {
+      if (this.loading) return;
+      if (!this.current.container) {
+        alert("No container selected");
+        return;
+      }
+      this.loading = true;
+      const envelope = {
+        payload: {
+          header: {
+            channel_header: {
+              channel_id: this.shortcuts.channel,
+              type: 2
+            }
+          },
+          data: {
+              config_update: {
+                channel_id: this.shortcuts.channel,
+                isolated_data: {},
+                read_set: JSON.parse(this.shortcuts.config),
+                write_set: JSON.parse(this.shortcuts.newConfig),
+              }
+          }
+        }
+      }
+      const { content, config } = await APIs.updateChannelConfig(
+        this.current.container.id,
+        this.current.container.host,
+        this.shortcuts.channel,
+        envelope
       );
       this.current.logs = content.split("\n");
       this.shortcuts.config = JSON.stringify(config, null, 2); 
