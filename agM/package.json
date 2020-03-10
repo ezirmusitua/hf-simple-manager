@@ -1,0 +1,23 @@
+{
+  "name": "agm",
+  "version": "0.1.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Nothing\"",
+    "start": "nodemon src/app.js"
+  },
+  "author": "",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "koa": "^2.11.0",
+    "koa-better-router": "^2.1.1"
+  },
+  "devDependencies": {
+    "@koa/cors": "^2.2.3",
+    "axios": "^0.19.2",
+    "koa-body": "^4.1.1",
+    "koa-json": "^2.0.2",
+    "nodemon": "^2.0.2"
+  }
+}

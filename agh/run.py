@@ -54,13 +54,16 @@ import json
 from aiohttp import web
 
 async def list_latest(request):
+    print ("call list")
     result = list()
     for container in DockerContainer.refresh_containers():
         result.append(container.to_json())
-    return web.Response(text=json.dumps(result), content_type='application/json')
+    return web.Response(text=json.dumps(dict(items=result)), content_type='application/json')
 
 async def logs(request):
+    print ("call logs")
     DockerContainer.refresh_containers()
+    print (await request.json())
     body = await request.json()
     container_id = body.get('id', None)
     if not container_id: return web.Response(text='container id is necessary')
@@ -70,6 +73,7 @@ async def logs(request):
     return web.Response(text=json.dumps(dict(content=logs_content.decode())), content_type='application/json')
 
 async def execute(request):
+    print ("call execute")
     DockerContainer.refresh_containers()
     body = await request.json()
     container_id = body.get('id', None)
@@ -86,4 +90,4 @@ if __name__ == "__main__":
     app.router.add_get('/', list_latest)
     app.router.add_post('/logs', logs)
     app.router.add_post('/exec', execute)
-    web.run_app(app)
+    web.run_app(app, host='0.0.0.0', port=8888)
