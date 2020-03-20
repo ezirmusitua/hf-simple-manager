@@ -111,9 +111,9 @@ export default {
       this.logs = [];
       this.config = null;
       this.newConfig = null;
-      this.channel = "mychannel";
+      this.channel = "";
       this.loading = false;
-      this.getChannelConfig();
+    //   this.getChannelConfig();
     }
   },
   data() {

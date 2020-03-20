@@ -113,7 +113,7 @@ import ConfigUpdate from './components/ConfigUpdate';
 const APIs = {
   listContainers: async () => {
     const { data } = await axios.post("http://172.30.4.121:3000/container", {
-      hosts: ["172.30.4.121"]
+      hosts: ["10.122.144.49"]
     });
     return data;
   },

@@ -13,7 +13,7 @@ working_dir = pathlib.PurePath('/home/jz/Projects/fabric-samples')
 configtxlator_bin_path = pathlib.PurePath(working_dir + '/bin/configtxlator')
 orderer_ca = pathlib.PurePath(
     '/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/example.com/msp/tlscacerts/tlsca.example.com-cert.pem')
-orderer_endpoint = 'orderer.example.com:7050'
+orderer_endpoint = 'orderer0.ebaas-orderer.example.com:8050'
 port = 8888
 
 def block_pb_2_json(pbfile, jsonfile):
@@ -44,7 +44,7 @@ class DockerContainer:
     def exec(self, command):
         if not command:
             raise Exception("command is necessary")
-        , logs = self._container.exec_run(command)
+        _, logs = self._container.exec_run(command)
         return logs
 
     def to_json(self):
